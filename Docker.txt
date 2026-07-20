@@ -1,0 +1,43 @@
+cd C:\Users\y0512\Desktop\bookstore
+cd "D:\IntelliJ IDEA 2025.1.1.1\bookstore"
+
+
+
+& "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe" -uroot -p -P 3306 --databases db_bookstore --result-file=db_dump.sql
+（docker-compose exec mysql mysqldump -uroot -p --databases db_bookstore > db_dump.sql）
+查询：docker exec -it bookstore-mysql mysql -uroot -p -e "SELECT id, title, stock FROM db_bookstore.t_books;"
+
+mvn clean package -DskipTests
+docker-compose up -d --build或docker-compose up -d
+http://10.21.126.216:8080/bookstore/或
+http://192.168.31.136:8080/bookstore/
+
+docker-compose down -v
+docker-compose down
+
+关闭：netstat -ano | findstr :8080
+         taskkill /PID 23396 /F
+
+# 安全重启（保留数据）
+docker-compose down
+docker-compose up -d
+
+# 危险重启（清空数据，重新初始化）
+docker-compose down -v
+docker-compose up -d
+
+# 只停 MySQL，Tomcat 继续运行
+docker stop bookstore-mysql
+
+# 或者全部停止
+docker-compose stop
+
+# 管理员权限运行
+net stop MySQL80
+
+# Docker MySQL
+docker start bookstore-mysql
+
+# 本地 MySQL
+net start MySQL80
+

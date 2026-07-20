@@ -1,0 +1,20 @@
+《哈利·波特与魔法石》
+封面URL：https://covers.openlibrary.org/b/isbn/9780590353427-M.jpg
+《霍比特人》
+封面URL：https://covers.openlibrary.org/b/isbn/9780261103344-M.jpg
+《一九八四》 (1984)
+封面URL：https://covers.openlibrary.org/b/isbn/9780451524935-M.jpg
+《了不起的盖茨比》
+封面URL：https://covers.openlibrary.org/b/isbn/9780743273565-M.jpg
+《傲慢与偏见》
+封面URL：https://covers.openlibrary.org/b/isbn/9780141439518-M.jpg
+《小王子》
+封面URL：https://covers.openlibrary.org/b/isbn/9780156012195-M.jpg
+蓝色极简艺术书封（适合文学或设计类图书）
+封面URL：https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=400&q=80
+复古牛皮纸质书封（适合历史、哲学或典籍类图书）
+封面URL：https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=400&q=80
+经典深色硬皮书封（适合文学、小说类图书）
+封面URL：https://images.unsplash.com/photo-1532012197267-da84d127e765?auto=format&fit=crop&w=400&q=80
+色彩明亮的现代图书（适合畅销书、社科或科技类图书）
+封面URL：https://images.unsplash.com/photo-1495640388908-05fa85288e61?auto=format&fit=crop&w=400&q=80

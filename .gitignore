@@ -1,0 +1,25 @@
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Build output
+target/
+build/
+out/
+
+# Frontend dependencies and generated output
+**/node_modules/
+src/main/webapp/frontend-src/dist/
+
+# Local credentials and database exports
+.env
+.env.*
+!.env.example
+src/main/resources/db.properties
+db_dump.sql
+
+# Logs and temporary files
+*.log
+*.tmp
+
