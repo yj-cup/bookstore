@@ -1,5 +1,3 @@
-﻿import re
-
 BASE = r'D:/IntelliJ IDEA 2025.1.1.1/bookstore/src/main/webapp/frontend-src/src'
 
 filepath = f'{BASE}/components/Navbar.tsx'
