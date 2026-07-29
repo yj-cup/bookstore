@@ -1,10 +1,13 @@
 package com.bookstore.servlet;
 
+import com.bookstore.dao.BookDao;
 import com.bookstore.dao.OrderDao;
+import com.bookstore.entity.Book;
 import com.bookstore.entity.CartItem;
 import com.bookstore.entity.Order;
 import com.bookstore.entity.OrderItem;
 import com.bookstore.entity.User;
+import com.bookstore.util.AuthorizationUtil;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -14,17 +17,32 @@ import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class OrderServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    private OrderDao orderDao = new OrderDao();
+    private final OrderDao orderDao;
+    private final BookDao bookDao;
+
+    public OrderServlet() {
+        this(new OrderDao(), new BookDao());
+    }
+
+    OrderServlet(OrderDao orderDao, BookDao bookDao) {
+        this.orderDao = orderDao;
+        this.bookDao = bookDao;
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String action = req.getParameter("action");
 
         if ("listAllOrders".equals(action)) {
+            if (!AuthorizationUtil.requireAdmin(req, resp)) {
+                return;
+            }
             // Admin API: 获取所有订单
             List<Order> orders = orderDao.findAll();
             writeJson(resp, "{\"success\":true,\"orders\":[" + ordersToJson(orders) + "]}");
@@ -97,7 +115,7 @@ public class OrderServlet extends HttpServlet {
             return;
         }
 
-        // 解析购物车商品（索引格式：itemBookId_0, itemTitle_0, ...）
+        // 仅接收图书ID和数量；价格、标题及封面必须从数据库加载。
         Order order = new Order();
         String orderId = "ORDER_" + new SimpleDateFormat("yyyyMMdd").format(new Date()) + (int)(Math.random() * 9000 + 1000);
         order.setId(orderId);
@@ -113,17 +131,26 @@ public class OrderServlet extends HttpServlet {
         order.setOrderTime(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
 
         double totalAmount = 0;
+        Set<String> seenBookIds = new HashSet<>();
         for (int i = 0; i < 100; i++) {
             String bookId = req.getParameter("itemBookId_" + i);
             if (bookId == null) break;
-            String title = req.getParameter("itemTitle_" + i);
-            String cover = req.getParameter("itemCover_" + i);
-            double price = parseDouble(req.getParameter("itemPrice_" + i), 0);
-            int qty = parseInt(req.getParameter("itemQty_" + i), 1);
+            bookId = bookId.trim();
+            int qty = parseInt(req.getParameter("itemQty_" + i), 0);
+            if (!seenBookIds.add(bookId)) {
+                writeJson(resp, "{\"success\":false,\"message\":\"订单中包含重复图书\"}");
+                return;
+            }
 
-            OrderItem item = new OrderItem(bookId, title != null ? title : "", cover != null ? cover : "", price, qty);
+            OrderItem item;
+            try {
+                item = createCanonicalOrderItem(bookId, qty);
+            } catch (IllegalArgumentException invalidItem) {
+                writeJson(resp, "{\"success\":false,\"message\":\"" + esc(invalidItem.getMessage()) + "\"}");
+                return;
+            }
             order.getItems().add(item);
-            totalAmount += price * qty;
+            totalAmount += item.getBookPrice() * item.getQuantity();
         }
 
         if (order.getItems().isEmpty()) {
@@ -142,8 +169,15 @@ public class OrderServlet extends HttpServlet {
     }
 
     private void handleUpdateOrderStatus(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        if (!AuthorizationUtil.requireAdmin(req, resp)) {
+            return;
+        }
         String id = req.getParameter("id");
         String status = req.getParameter("status");
+        if (!isAllowedOrderStatus(status)) {
+            writeJson(resp, "{\"success\":false,\"message\":\"订单状态不合法\"}");
+            return;
+        }
         if (orderDao.updateStatus(id, status)) {
             writeJson(resp, "{\"success\":true,\"message\":\"订单状态已更新\"}");
         } else {
@@ -152,6 +186,9 @@ public class OrderServlet extends HttpServlet {
     }
 
     private void handleDeleteOrder(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        if (!AuthorizationUtil.requireAdmin(req, resp)) {
+            return;
+        }
         String id = req.getParameter("id");
         if (orderDao.delete(id)) {
             writeJson(resp, "{\"success\":true,\"message\":\"订单已删除\"}");
@@ -252,9 +289,16 @@ public class OrderServlet extends HttpServlet {
 
         double totalAmount = 0;
         for (CartItem item : cart) {
-            OrderItem detail = new OrderItem(item.getBookId(), item.getBookTitle(), item.getBookCover(), item.getBookPrice(), item.getQuantity());
+            OrderItem detail;
+            try {
+                detail = createCanonicalOrderItem(item.getBookId(), item.getQuantity());
+            } catch (IllegalArgumentException invalidItem) {
+                req.setAttribute("checkout_error", "下单失败：" + invalidItem.getMessage());
+                req.getRequestDispatcher("/WEB-INF/jsp/cart.jsp").forward(req, resp);
+                return;
+            }
             order.getItems().add(detail);
-            totalAmount += item.getBookPrice() * item.getQuantity();
+            totalAmount += detail.getBookPrice() * detail.getQuantity();
         }
         order.setTotalAmount(totalAmount);
 
@@ -280,14 +324,37 @@ public class OrderServlet extends HttpServlet {
         resp.getWriter().write(json);
     }
 
-    private double parseDouble(String s, double defaultVal) {
-        if (s == null || s.trim().isEmpty()) return defaultVal;
-        try { return Double.parseDouble(s.trim()); } catch (NumberFormatException e) { return defaultVal; }
-    }
-
     private int parseInt(String s, int defaultVal) {
         if (s == null || s.trim().isEmpty()) return defaultVal;
         try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return defaultVal; }
+    }
+
+    OrderItem createCanonicalOrderItem(String bookId, int quantity) {
+        if (bookId == null || bookId.trim().isEmpty()) {
+            throw new IllegalArgumentException("图书ID不能为空");
+        }
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("购买数量必须大于0");
+        }
+
+        Book book = bookDao.findById(bookId.trim());
+        if (book == null) {
+            throw new IllegalArgumentException("图书不存在");
+        }
+        return new OrderItem(
+            book.getId(),
+            book.getTitle(),
+            book.getCoverImage(),
+            book.getPrice(),
+            quantity
+        );
+    }
+
+    private boolean isAllowedOrderStatus(String status) {
+        return "Pending".equals(status)
+            || "Shipped".equals(status)
+            || "Completed".equals(status)
+            || "Cancelled".equals(status);
     }
 
     private String ordersToJson(List<Order> orders) {

@@ -13,68 +13,11 @@ import AuthModal from './components/AuthModal';
 import CartModal from './components/CartModal';
 import AdminPanel from './components/AdminPanel';
 
-// Seed initial demo data for a robust out-of-the-box experience
-const SEED_USERS: User[] = [
-  {
-    id: 'u_1',
-    username: 'zhangsan',
-    password: '123456',
-    role: 'user',
-    idCard: '42010619951208453X',
-    qq: '348912345',
-    phone: '13971234567',
-    email: 'zhangsan@foxmail.com',
-    registeredAt: '2026-06-20T10:00:00Z'
-  },
-  {
-    id: 'admin_1',
-    username: 'admin',
-    password: 'admin123',
-    role: 'admin',
-    idCard: '110101199003071234',
-    qq: '10001',
-    phone: '13888888888',
-    email: 'admin@bookstore.com',
-    registeredAt: '2026-06-01T08:00:00Z'
-  }
-];
-
-const SEED_ORDERS: Order[] = [
-  {
-    id: 'ORDER_20260624001',
-    userId: 'u_1',
-    username: 'zhangsan',
-    details: {
-      idCard: '42010619951208453X',
-      qq: '348912345',
-      phone: '13971234567',
-      email: 'zhangsan@foxmail.com',
-      shippingAddress: '湖北省武汉市武昌区八一路299号武汉大学宿舍区',
-      receiverName: '张三'
-    },
-    items: [
-      {
-        bookId: 'b1',
-        book: INITIAL_BOOKS[0], // Great Gatsby
-        quantity: 1
-      },
-      {
-        bookId: 'b5',
-        book: INITIAL_BOOKS[4], // Little Prince
-        quantity: 2
-      }
-    ],
-    totalAmount: 109.00,
-    status: 'Completed',
-    orderTime: '2026-06-24T14:30:00.000Z'
-  }
-];
-
 export default function App() {
   // Core Data States
   const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
-  const [users, setUsers] = useState<User[]>(SEED_USERS);
-  const [orders, setOrders] = useState<Order[]>(SEED_ORDERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
   // UI Display States
@@ -331,9 +274,6 @@ export default function App() {
     // 添加购物车商品索引参数
     cart.forEach((item, i) => {
       params.append(`itemBookId_${i}`, item.bookId);
-      params.append(`itemTitle_${i}`, item.book.title);
-      params.append(`itemCover_${i}`, item.book.coverImage);
-      params.append(`itemPrice_${i}`, String(item.book.price));
       params.append(`itemQty_${i}`, String(item.quantity));
     });
 

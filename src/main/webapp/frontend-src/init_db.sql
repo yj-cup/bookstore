@@ -23,7 +23,10 @@ CREATE TABLE `t_books` (
   `description` text COMMENT '图书详细描述',
   `cover_image` varchar(512) DEFAULT NULL COMMENT '图书封面图片URL链接',
   `rating` decimal(3,1) DEFAULT '0.0' COMMENT '图书星级评分',
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  CONSTRAINT `chk_books_price` CHECK (`price` >= 0),
+  CONSTRAINT `chk_books_stock` CHECK (`stock` >= 0),
+  CONSTRAINT `chk_books_rating` CHECK (`rating` >= 0 AND `rating` <= 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图书明细主表';
 
 -- ----------------------------
@@ -34,13 +37,14 @@ CREATE TABLE `t_users` (
   `id` varchar(50) NOT NULL COMMENT '用户ID',
   `username` varchar(100) NOT NULL COMMENT '登录账户名',
   `password` varchar(255) NOT NULL COMMENT '登录密码',
-  `role` varchar(20) DEFAULT 'user' COMMENT '用户角色: user代表普通买家, admin代表后台管理员',
+  `role` varchar(20) NOT NULL DEFAULT 'user' COMMENT '用户角色: user代表普通买家, admin代表后台管理员',
   `id_card` varchar(18) DEFAULT NULL COMMENT '实名注册身份证号',
   `qq` varchar(20) DEFAULT NULL COMMENT '用户QQ联络号',
   `phone` varchar(20) DEFAULT NULL COMMENT '用户移动电话号码',
   `email` varchar(100) DEFAULT NULL COMMENT '电子邮件地址',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_username` (`username`)
+  UNIQUE KEY `uk_username` (`username`),
+  CONSTRAINT `chk_users_role` CHECK (`role` IN ('user', 'admin', 'disabled'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户账号信息表';
 
 -- ----------------------------
@@ -51,16 +55,18 @@ CREATE TABLE `t_orders` (
   `id` varchar(50) NOT NULL COMMENT '订单编号ID',
   `user_id` varchar(50) NOT NULL COMMENT '关联买家账户ID',
   `total_amount` decimal(10,2) NOT NULL COMMENT '订单成交总金额',
-  `status` varchar(20) DEFAULT 'Pending' COMMENT '订单流转状态: Pending-待发货, Shipped-已发货, Completed-已完成, Cancelled-已取消',
+  `status` varchar(20) NOT NULL DEFAULT 'Pending' COMMENT '订单流转状态: Pending-待发货, Shipped-已发货, Completed-已完成, Cancelled-已取消',
   `id_card` varchar(18) DEFAULT NULL COMMENT '收货身份证号验证',
   `receiver_name` varchar(100) DEFAULT NULL COMMENT '收件人真实姓名',
   `phone` varchar(20) DEFAULT NULL COMMENT '收件人联系电话',
   `qq` varchar(20) DEFAULT NULL COMMENT '收件人QQ号',
   `email` varchar(100) DEFAULT NULL COMMENT '收件人电子邮箱',
   `address` varchar(512) DEFAULT NULL COMMENT '收货详细物理地址',
-  `order_time` varchar(50) DEFAULT NULL COMMENT '创建订单日期时间戳格式',
+  `order_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建订单日期时间戳',
   PRIMARY KEY (`id`),
-  KEY `idx_user_id` (`user_id`)
+  KEY `idx_orders_user_time` (`user_id`, `order_time`),
+  CONSTRAINT `chk_orders_total` CHECK (`total_amount` >= 0),
+  CONSTRAINT `chk_orders_status` CHECK (`status` IN ('Pending', 'Shipped', 'Completed', 'Cancelled'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单事务主表';
 
 -- ----------------------------
@@ -76,7 +82,11 @@ CREATE TABLE `t_order_items` (
   `book_price` decimal(10,2) NOT NULL COMMENT '交易成交单价',
   `quantity` int NOT NULL COMMENT '购买成交数量',
   PRIMARY KEY (`id`),
-  KEY `fk_order_id` (`order_id`)
+  UNIQUE KEY `uk_order_book` (`order_id`, `book_id`),
+  KEY `idx_order_items_book` (`book_id`),
+  CONSTRAINT `fk_order_items_order` FOREIGN KEY (`order_id`) REFERENCES `t_orders` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_order_items_price` CHECK (`book_price` >= 0),
+  CONSTRAINT `chk_order_items_quantity` CHECK (`quantity` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单商品详情细表';
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -86,12 +96,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- 数据填充 (DML) - 插入基础初始化种子数据
 -- =====================================================================
 
--- 2. 插入测试用户
--- 提供默认管理员账号: admin / admin
--- 提供普通测试账号: test / 123456
-INSERT INTO `t_users` (`id`, `username`, `password`, `role`, `id_card`, `qq`, `phone`, `email`) VALUES 
-('u1', 'admin', 'admin', 'admin', '110101199001011234', '123456789', '13800138000', 'admin@bookstore.com'),
-('u2', 'test', '123456', 'user', '110101199505055678', '987654321', '13900139000', 'test@bookstore.com');
+-- 不提供默认账户。先通过页面注册普通账户，再由数据库管理员将目标账户角色改为 admin。
 
 -- 3. 插入初始图书数据
 -- 与 React 页面中渲染的图片及价格细节100%同步

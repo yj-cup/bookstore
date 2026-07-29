@@ -238,7 +238,7 @@ export default function AuthModal({
 
       addLog('SERVLET', `AuthServlet: 用户 [${username}] 数据通过前端 Regex 验证，发送注册请求...`);
       addLog('JDBC', '将新用户写入数据库 t_users',
-        `INSERT INTO t_users (id, username, password, role, id_card, qq, phone, email)\nVALUES ('...', '${username}', '${password}', 'user', '${idCard}', '${qq}', '${phone}', '${email}')`
+        `INSERT INTO t_users (id, username, password, role, id_card, qq, phone, email) VALUES ('...', '${username}', '<bcrypt-hash>', 'user', '${idCard}', '${qq}', '${phone}', '${email}')`
       );
 
       try {
@@ -283,29 +283,6 @@ export default function AuthModal({
         setErrors({ submit: '网络错误，无法连接后端服务器' });
         addLog('SERVLET', `AuthServlet: 请求后端失败 - ${err}`);
       }
-    }
-  };
-
-  // Pre-populate fields for quick grading / demo
-  const handleQuickFill = () => {
-    if (isLogin) {
-      if (isAdminMode) {
-        setUsername('admin');
-        setPassword('admin123');
-      } else {
-        setUsername('zhangsan');
-        setPassword('123456');
-      }
-    } else {
-      setUsername('李四_Lisi');
-      setPassword('123456');
-      setConfirmPassword('123456');
-      setIdCard('42010619951208453X');
-      setQq('348912345');
-      setPhone('13971234567');
-      setEmail('lisi@foxmail.com');
-      
-      addLog('SERVLET', 'RegisterServlet: 触发快捷一键填表（满足课程设计复杂表单快速测试）');
     }
   };
 
@@ -363,19 +340,6 @@ export default function AuthModal({
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleQuickFill}
-                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-semibold transition-all cursor-pointer border border-indigo-100 dark:border-indigo-900/30 active:scale-95"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  <span>一键快速填表 / 演示填值</span>
-                </button>
-                <div className="text-[10px] text-slate-400 text-center italic">
-                  * 免去手动输入的繁琐
-                </div>
-              </div>
             </div>
 
             {/* Right Side: Form Inputs */}
