@@ -102,7 +102,11 @@
             var params = new URLSearchParams({ action: 'cancelOrder', id: orderId });
             fetch('${pageContext.request.contextPath}/order', {
                 method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': '${csrfToken}'
+                },
                 credentials: 'include',
                 body: params.toString()
             }).then(function(res) { return res.json(); })

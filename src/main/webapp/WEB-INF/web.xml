@@ -16,7 +16,33 @@
         <url-pattern>/*</url-pattern>
     </filter-mapping>
 
-    <!-- 2. 后台管理权限安全拦截器 -->
+    <!-- 2. 所有业务状态变更的 CSRF 防护 -->
+    <filter>
+        <filter-name>CsrfFilter</filter-name>
+        <filter-class>com.bookstore.filter.CsrfFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>CsrfFilter</filter-name>
+        <servlet-name>AuthServlet</servlet-name>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>CsrfFilter</filter-name>
+        <servlet-name>BookServlet</servlet-name>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>CsrfFilter</filter-name>
+        <servlet-name>CartServlet</servlet-name>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>CsrfFilter</filter-name>
+        <servlet-name>OrderServlet</servlet-name>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>CsrfFilter</filter-name>
+        <servlet-name>AdminServlet</servlet-name>
+    </filter-mapping>
+
+    <!-- 3. 后台管理权限安全拦截器 -->
     <filter>
         <filter-name>SecurityFilter</filter-name>
         <filter-class>com.bookstore.filter.SecurityFilter</filter-class>
@@ -26,7 +52,7 @@
         <url-pattern>/admin/manage/*</url-pattern>
     </filter-mapping>
 
-    <!-- 3. 登录与注册控制器 -->
+    <!-- 4. 登录与注册控制器 -->
     <servlet>
         <servlet-name>AuthServlet</servlet-name>
         <servlet-class>com.bookstore.servlet.AuthServlet</servlet-class>

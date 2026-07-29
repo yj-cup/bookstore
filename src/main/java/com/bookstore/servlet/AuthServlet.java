@@ -3,6 +3,7 @@ package com.bookstore.servlet;
 import com.bookstore.dao.UserDao;
 import com.bookstore.entity.User;
 import com.bookstore.util.AuthorizationUtil;
+import com.bookstore.filter.CsrfFilter;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -29,15 +30,11 @@ public class AuthServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String action = req.getParameter("action");
         if ("logout".equals(action)) {
-            HttpSession session = req.getSession(false);
-            if (session != null) {
-                session.invalidate(); // 完全注销会话
-            }
-            if (isAjax(req)) {
-                writeJson(resp, "{\"success\":true,\"message\":\"已注销\"}");
-            } else {
-                resp.sendRedirect(req.getContextPath() + "/books");
-            }
+            resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            writeJson(resp, "{\"success\":false,\"message\":\"注销只允许使用POST\"}");
+        } else if ("csrfToken".equals(action)) {
+            String token = (String) req.getAttribute(CsrfFilter.REQUEST_ATTRIBUTE);
+            writeJson(resp, "{\"success\":true,\"csrfToken\":\"" + escape(token) + "\"}");
         } else if ("getCurrentUser".equals(action)) {
             // AJAX API: 获取当前登录用户信息
             HttpSession session = req.getSession(false);
@@ -73,6 +70,8 @@ public class AuthServlet extends HttpServlet {
             handleLogin(req, resp);
         } else if ("register".equals(action)) {
             handleRegister(req, resp);
+        } else if ("logout".equals(action)) {
+            handleLogout(req, resp);
         } else if ("updateUser".equals(action)) {
             if (AuthorizationUtil.requireAdmin(req, resp)) {
                 handleUpdateUser(req, resp);
@@ -87,6 +86,18 @@ public class AuthServlet extends HttpServlet {
             }
         } else {
             doGet(req, resp);
+        }
+    }
+
+    private void handleLogout(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        if (isAjax(req)) {
+            writeJson(resp, "{\"success\":true,\"message\":\"已注销\"}");
+        } else {
+            resp.sendRedirect(req.getContextPath() + "/books");
         }
     }
 
@@ -280,10 +291,6 @@ public class AuthServlet extends HttpServlet {
 
     private void writeJson(HttpServletResponse resp, String json) throws IOException {
         resp.setContentType("application/json;charset=UTF-8");
-        // 添加 CORS 支持，允许跨域请求携带凭证
-        resp.setHeader("Access-Control-Allow-Origin", "*");
-        resp.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        resp.setHeader("Access-Control-Allow-Credentials", "true");
         resp.getWriter().write(json);
     }
 

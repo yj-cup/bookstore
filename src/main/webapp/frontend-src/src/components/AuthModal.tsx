@@ -5,6 +5,7 @@ import {
   MessageSquare, CheckCircle, AlertCircle, Info, ShieldAlert 
 } from 'lucide-react';
 import { User, LogEntry } from '../types';
+import { csrfFetch } from '../security/csrf';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export default function AuthModal({
         addLog('JDBC', '查询管理员登录凭证', `SELECT * FROM t_users WHERE username='${username}' AND password='***' AND role='admin'`);
         try {
           const params = new URLSearchParams({ action: 'login', username, password });
-          const res = await fetch(`${apiBase}?action=login`, {
+          const res = await csrfFetch(`${apiBase}?action=login`, {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
             credentials: 'include',
@@ -165,7 +166,7 @@ export default function AuthModal({
             };
             addLog('SERVLET', `AuthServlet: 管理员 [${username}] 鉴权成功，建立 Session 会话`);
             // 同步用户列表
-            const listRes = await fetch(`${apiBase}?action=listUsers`, {
+            const listRes = await csrfFetch(`${apiBase}?action=listUsers`, {
               headers: { 'Accept': 'application/json' }, credentials: 'include'
             });
             const listData = await listRes.json();
@@ -191,7 +192,7 @@ export default function AuthModal({
         addLog('JDBC', '查询用户登录凭证', `SELECT * FROM t_users WHERE username='${username}' AND password='***'`);
         try {
           const params = new URLSearchParams({ action: 'login', username, password });
-          const res = await fetch(`${apiBase}?action=login`, {
+          const res = await csrfFetch(`${apiBase}?action=login`, {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
             credentials: 'include',
@@ -206,7 +207,7 @@ export default function AuthModal({
               registeredAt: new Date().toISOString()
             };
             addLog('SERVLET', `AuthServlet: 用户 [${username}] 登录成功，角色：${u.role}`);
-            const listRes = await fetch(`${apiBase}?action=listUsers`, {
+            const listRes = await csrfFetch(`${apiBase}?action=listUsers`, {
               headers: { 'Accept': 'application/json' }, credentials: 'include'
             });
             const listData = await listRes.json();
@@ -245,7 +246,7 @@ export default function AuthModal({
         const params = new URLSearchParams({
           action: 'register', username, password, idCard, qq, phone, email
         });
-        const res = await fetch(`${apiBase}?action=register`, {
+        const res = await csrfFetch(`${apiBase}?action=register`, {
           method: 'POST',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
           credentials: 'include',
@@ -255,7 +256,7 @@ export default function AuthModal({
         if (data.success) {
           addLog('SERVLET', `AuthServlet: 用户 [${username}] 注册成功，已写入 MySQL 数据库`);
           // 同步用户列表
-          const listRes = await fetch(`${apiBase}?action=listUsers`, {
+          const listRes = await csrfFetch(`${apiBase}?action=listUsers`, {
             headers: { 'Accept': 'application/json' }, credentials: 'include'
           });
           const listData = await listRes.json();
