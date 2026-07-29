@@ -30,6 +30,7 @@
                     
                     <form action="${pageContext.request.contextPath}/auth" method="POST">
                         <input type="hidden" name="action" value="login" />
+                        <input type="hidden" name="csrfToken" value="${csrfToken}" />
                         <div class="mb-3">
                             <label class="form-label text-muted">账户名</label>
                             <input type="text" name="username" class="form-control" required placeholder="请输入登录账号..." />
@@ -67,6 +68,7 @@
 
                     <form action="${pageContext.request.contextPath}/auth" method="POST">
                         <input type="hidden" name="action" value="register" />
+                        <input type="hidden" name="csrfToken" value="${csrfToken}" />
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">

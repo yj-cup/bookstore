@@ -55,7 +55,11 @@
                                     </span>
                                 </c:if>
                             </a>
-                            <a href="${pageContext.request.contextPath}/auth?action=logout" class="btn btn-outline-danger btn-sm">退出</a>
+                            <form action="${pageContext.request.contextPath}/auth" method="POST" class="d-inline">
+                                <input type="hidden" name="action" value="logout" />
+                                <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm">退出</button>
+                            </form>
                         </c:otherwise>
                     </c:choose>
                 </div>
@@ -140,9 +144,12 @@
                                                 </div>
                                                 <c:choose>
                                                     <c:when test="${book.stock > 0}">
-                                                        <a href="${pageContext.request.contextPath}/cart?action=add&bookId=${book.id}" class="btn btn-outline-primary btn-sm w-100">
-                                                            立即购书
-                                                        </a>
+                                                        <form action="${pageContext.request.contextPath}/cart" method="POST">
+                                                            <input type="hidden" name="action" value="add" />
+                                                            <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                                                            <input type="hidden" name="bookId" value="${book.id}" />
+                                                            <button type="submit" class="btn btn-outline-primary btn-sm w-100">立即购书</button>
+                                                        </form>
                                                     </c:when>
                                                     <c:otherwise>
                                                         <button class="btn btn-secondary btn-sm w-100" disabled>无货下架</button>

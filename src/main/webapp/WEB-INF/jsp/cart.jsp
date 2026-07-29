@@ -48,12 +48,18 @@
                                                     <td>
                                                         <form action="${pageContext.request.contextPath}/cart" method="POST" style="width: 80px;">
                                                             <input type="hidden" name="action" value="update" />
+                                                            <input type="hidden" name="csrfToken" value="${csrfToken}" />
                                                             <input type="hidden" name="bookId" value="${item.bookId}" />
                                                             <input type="number" name="qty" value="${item.quantity}" min="1" class="form-control form-control-sm text-center" onchange="this.form.submit()" />
                                                         </form>
                                                     </td>
                                                     <td>
-                                                        <a href="${pageContext.request.contextPath}/cart?action=remove&bookId=${item.bookId}" class="btn btn-outline-danger btn-sm">移除</a>
+                                                        <form action="${pageContext.request.contextPath}/cart" method="POST" class="d-inline">
+                                                            <input type="hidden" name="action" value="remove" />
+                                                            <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                                                            <input type="hidden" name="bookId" value="${item.bookId}" />
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm">移除</button>
+                                                        </form>
                                                     </td>
                                                 </tr>
                                             </c:forEach>
@@ -61,7 +67,11 @@
                                     </table>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center mt-4">
-                                    <a href="${pageContext.request.contextPath}/cart?action=clear" class="btn btn-outline-secondary btn-sm">一键清空购物车</a>
+                                    <form action="${pageContext.request.contextPath}/cart" method="POST" class="d-inline">
+                                        <input type="hidden" name="action" value="clear" />
+                                        <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm">一键清空购物车</button>
+                                    </form>
                                     <a href="${pageContext.request.contextPath}/books" class="btn btn-outline-primary btn-sm">继续选书</a>
                                 </div>
                             </c:otherwise>
@@ -83,6 +93,7 @@
                         </c:if>
 
                         <form action="${pageContext.request.contextPath}/order" method="POST">
+                            <input type="hidden" name="csrfToken" value="${csrfToken}" />
                             <div class="mb-3">
                                 <label class="form-label text-muted text-xs">实名收货人 <span class="text-danger">*</span></label>
                                 <input type="text" name="receiverName" class="form-control form-control-sm" required placeholder="请填写买家收货姓名..." value="${currentUser.username}" />

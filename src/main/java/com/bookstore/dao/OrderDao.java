@@ -12,6 +12,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class OrderDao {
+    @FunctionalInterface
+    interface ConnectionProvider {
+        Connection getConnection() throws SQLException;
+    }
+
+    private final ConnectionProvider cancellationConnectionProvider;
+
+    public OrderDao() {
+        this(DBUtil::getConnection);
+    }
+
+    OrderDao(ConnectionProvider cancellationConnectionProvider) {
+        this.cancellationConnectionProvider = cancellationConnectionProvider;
+    }
 
     /**
      * 核心事务结算方法 (ACID 事务控制示范)
@@ -174,7 +188,58 @@ public class OrderDao {
         PreparedStatement queryStmt = null;
         ResultSet rs = null;
         try {
-            conn = DBUtil.getConnection();
+            conn = cancellationConnectionProvider.getConnection();
+
+            // Cancellation must lock the order and restore stock in one transaction.
+            if ("Cancelled".equals(status)) {
+                conn.setAutoCommit(false);
+
+                queryStmt = conn.prepareStatement(
+                    "SELECT status FROM t_orders WHERE id = ? FOR UPDATE"
+                );
+                queryStmt.setString(1, orderId);
+                rs = queryStmt.executeQuery();
+
+                if (!rs.next()) {
+                    conn.rollback();
+                    return false;
+                }
+
+                String currentStatus = rs.getString("status");
+                rs.close();
+                rs = null;
+                queryStmt.close();
+                queryStmt = null;
+
+                if ("Cancelled".equals(currentStatus)) {
+                    conn.commit();
+                    return true;
+                }
+
+                List<OrderItem> items = queryOrderItems(conn, orderId);
+                try (PreparedStatement restoreStmt = conn.prepareStatement(
+                        "UPDATE t_books SET stock = stock + ? WHERE id = ?")) {
+                    for (OrderItem item : items) {
+                        restoreStmt.setInt(1, item.getQuantity());
+                        restoreStmt.setString(2, item.getBookId());
+                        restoreStmt.executeUpdate();
+                    }
+                }
+
+                stmt = conn.prepareStatement(
+                    "UPDATE t_orders SET status = ? WHERE id = ? AND status <> 'Cancelled'"
+                );
+                stmt.setString(1, status);
+                stmt.setString(2, orderId);
+                int updatedRows = stmt.executeUpdate();
+                if (updatedRows != 1) {
+                    conn.rollback();
+                    return false;
+                }
+
+                conn.commit();
+                return true;
+            }
             
             // 查询订单当前状态
             queryStmt = conn.prepareStatement("SELECT status FROM t_orders WHERE id = ?");
@@ -189,43 +254,11 @@ public class OrderDao {
             rs.close();
             queryStmt.close();
             
-            // 如果订单被取消,需要恢复库存
-            if ("Cancelled".equals(status)) {
-                // 防止重复取消: 如果已经是已取消状态,直接返回成功
-                if ("Cancelled".equals(currentStatus)) {
-                    return true;
-                }
-                
-                conn.setAutoCommit(false);
-                
-                // 1. 查询订单明细,获取所有书籍及数量
-                List<OrderItem> items = queryOrderItems(orderId);
-                
-                // 2. 恢复库存
-                String restoreStockSql = "UPDATE t_books SET stock = stock + ? WHERE id = ?";
-                PreparedStatement restoreStmt = conn.prepareStatement(restoreStockSql);
-                for (OrderItem item : items) {
-                    restoreStmt.setInt(1, item.getQuantity());
-                    restoreStmt.setString(2, item.getBookId());
-                    restoreStmt.executeUpdate();
-                }
-                restoreStmt.close();
-                
-                // 3. 更新订单状态为已取消
-                stmt = conn.prepareStatement("UPDATE t_orders SET status = ? WHERE id = ?");
-                stmt.setString(1, status);
-                stmt.setString(2, orderId);
-                stmt.executeUpdate();
-                
-                conn.commit();
-                return true;
-            } else {
-                // 其他状态变更,正常更新
-                stmt = conn.prepareStatement("UPDATE t_orders SET status = ? WHERE id = ?");
-                stmt.setString(1, status);
-                stmt.setString(2, orderId);
-                return stmt.executeUpdate() > 0;
-            }
+            // 其他状态变更,正常更新
+            stmt = conn.prepareStatement("UPDATE t_orders SET status = ? WHERE id = ?");
+            stmt.setString(1, status);
+            stmt.setString(2, orderId);
+            return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
             e.printStackTrace();
             if (conn != null) {
@@ -237,8 +270,10 @@ public class OrderDao {
             }
             return false;
         } finally {
-            DBUtil.close(rs, queryStmt, null);
-            DBUtil.close(stmt, conn);
+            closeQuietly(rs);
+            closeQuietly(queryStmt);
+            closeQuietly(stmt);
+            closeQuietly(conn);
         }
     }
 
@@ -337,6 +372,39 @@ public class OrderDao {
             DBUtil.close(rs, stmt, conn);
         }
         return list;
+    }
+
+    private List<OrderItem> queryOrderItems(Connection conn, String orderId) throws SQLException {
+        List<OrderItem> list = new ArrayList<>();
+        String sql = "SELECT * FROM t_order_items WHERE order_id = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, orderId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    OrderItem item = new OrderItem();
+                    item.setId(rs.getInt("id"));
+                    item.setOrderId(rs.getString("order_id"));
+                    item.setBookId(rs.getString("book_id"));
+                    item.setBookTitle(rs.getString("book_title"));
+                    item.setBookCover(rs.getString("book_cover"));
+                    item.setBookPrice(rs.getDouble("book_price"));
+                    item.setQuantity(rs.getInt("quantity"));
+                    list.add(item);
+                }
+            }
+        }
+        return list;
+    }
+
+    private void closeQuietly(AutoCloseable resource) {
+        if (resource == null) {
+            return;
+        }
+        try {
+            resource.close();
+        } catch (Exception closeError) {
+            closeError.printStackTrace();
+        }
     }
 
     private Order extractOrder(ResultSet rs) throws SQLException {

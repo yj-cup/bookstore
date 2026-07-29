@@ -22,7 +22,11 @@
                 </ul>
                 <div class="text-white">
                     安全登录身份：<span class="text-warning font-weight-bold">超级管理员(admin)</span>
-                    <a href="${pageContext.request.contextPath}/auth?action=logout" class="btn btn-outline-danger btn-sm ms-3">退出</a>
+                    <form action="${pageContext.request.contextPath}/auth" method="POST" class="d-inline ms-3">
+                        <input type="hidden" name="action" value="logout" />
+                        <input type="hidden" name="csrfToken" value="${csrfToken}" />
+                        <button type="submit" class="btn btn-outline-danger btn-sm">退出</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -148,6 +152,7 @@
                                             </td>
                                             <td>
                                                 <form action="${pageContext.request.contextPath}/admin/manage/updateOrderStatus" method="POST" class="d-inline">
+                                                    <input type="hidden" name="csrfToken" value="${csrfToken}" />
                                                     <input type="hidden" name="id" value="${order.id}" />
                                                     <select name="status" onchange="this.form.submit()" class="form-select form-select-sm py-0 text-xs d-inline-block" style="width: 80px;">
                                                         <option value="Pending" ${order.status == 'Pending' ? 'selected' : ''}>待发</option>
@@ -172,6 +177,7 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="${pageContext.request.contextPath}/admin/manage/addBook" method="POST">
+                    <input type="hidden" name="csrfToken" value="${csrfToken}" />
                     <div class="modal-header">
                         <h5 class="modal-title fw-bold">上架全新馆藏图书</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

@@ -5,6 +5,7 @@ import {
   MessageSquare, CheckCircle, AlertCircle, Info, ShieldAlert 
 } from 'lucide-react';
 import { User, LogEntry } from '../types';
+import { csrfFetch } from '../security/csrf';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export default function AuthModal({
         addLog('JDBC', '查询管理员登录凭证', `SELECT * FROM t_users WHERE username='${username}' AND password='***' AND role='admin'`);
         try {
           const params = new URLSearchParams({ action: 'login', username, password });
-          const res = await fetch(`${apiBase}?action=login`, {
+          const res = await csrfFetch(`${apiBase}?action=login`, {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
             credentials: 'include',
@@ -165,7 +166,7 @@ export default function AuthModal({
             };
             addLog('SERVLET', `AuthServlet: 管理员 [${username}] 鉴权成功，建立 Session 会话`);
             // 同步用户列表
-            const listRes = await fetch(`${apiBase}?action=listUsers`, {
+            const listRes = await csrfFetch(`${apiBase}?action=listUsers`, {
               headers: { 'Accept': 'application/json' }, credentials: 'include'
             });
             const listData = await listRes.json();
@@ -191,7 +192,7 @@ export default function AuthModal({
         addLog('JDBC', '查询用户登录凭证', `SELECT * FROM t_users WHERE username='${username}' AND password='***'`);
         try {
           const params = new URLSearchParams({ action: 'login', username, password });
-          const res = await fetch(`${apiBase}?action=login`, {
+          const res = await csrfFetch(`${apiBase}?action=login`, {
             method: 'POST',
             headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
             credentials: 'include',
@@ -206,7 +207,7 @@ export default function AuthModal({
               registeredAt: new Date().toISOString()
             };
             addLog('SERVLET', `AuthServlet: 用户 [${username}] 登录成功，角色：${u.role}`);
-            const listRes = await fetch(`${apiBase}?action=listUsers`, {
+            const listRes = await csrfFetch(`${apiBase}?action=listUsers`, {
               headers: { 'Accept': 'application/json' }, credentials: 'include'
             });
             const listData = await listRes.json();
@@ -238,14 +239,14 @@ export default function AuthModal({
 
       addLog('SERVLET', `AuthServlet: 用户 [${username}] 数据通过前端 Regex 验证，发送注册请求...`);
       addLog('JDBC', '将新用户写入数据库 t_users',
-        `INSERT INTO t_users (id, username, password, role, id_card, qq, phone, email)\nVALUES ('...', '${username}', '${password}', 'user', '${idCard}', '${qq}', '${phone}', '${email}')`
+        `INSERT INTO t_users (id, username, password, role, id_card, qq, phone, email) VALUES ('...', '${username}', '<bcrypt-hash>', 'user', '${idCard}', '${qq}', '${phone}', '${email}')`
       );
 
       try {
         const params = new URLSearchParams({
           action: 'register', username, password, idCard, qq, phone, email
         });
-        const res = await fetch(`${apiBase}?action=register`, {
+        const res = await csrfFetch(`${apiBase}?action=register`, {
           method: 'POST',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
           credentials: 'include',
@@ -255,7 +256,7 @@ export default function AuthModal({
         if (data.success) {
           addLog('SERVLET', `AuthServlet: 用户 [${username}] 注册成功，已写入 MySQL 数据库`);
           // 同步用户列表
-          const listRes = await fetch(`${apiBase}?action=listUsers`, {
+          const listRes = await csrfFetch(`${apiBase}?action=listUsers`, {
             headers: { 'Accept': 'application/json' }, credentials: 'include'
           });
           const listData = await listRes.json();
@@ -283,29 +284,6 @@ export default function AuthModal({
         setErrors({ submit: '网络错误，无法连接后端服务器' });
         addLog('SERVLET', `AuthServlet: 请求后端失败 - ${err}`);
       }
-    }
-  };
-
-  // Pre-populate fields for quick grading / demo
-  const handleQuickFill = () => {
-    if (isLogin) {
-      if (isAdminMode) {
-        setUsername('admin');
-        setPassword('admin123');
-      } else {
-        setUsername('zhangsan');
-        setPassword('123456');
-      }
-    } else {
-      setUsername('李四_Lisi');
-      setPassword('123456');
-      setConfirmPassword('123456');
-      setIdCard('42010619951208453X');
-      setQq('348912345');
-      setPhone('13971234567');
-      setEmail('lisi@foxmail.com');
-      
-      addLog('SERVLET', 'RegisterServlet: 触发快捷一键填表（满足课程设计复杂表单快速测试）');
     }
   };
 
@@ -363,19 +341,6 @@ export default function AuthModal({
                 </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={handleQuickFill}
-                  className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-semibold transition-all cursor-pointer border border-indigo-100 dark:border-indigo-900/30 active:scale-95"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  <span>一键快速填表 / 演示填值</span>
-                </button>
-                <div className="text-[10px] text-slate-400 text-center italic">
-                  * 免去手动输入的繁琐
-                </div>
-              </div>
             </div>
 
             {/* Right Side: Form Inputs */}

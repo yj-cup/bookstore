@@ -20,33 +20,27 @@ public class CartServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String action = req.getParameter("action");
-        if (action == null) {
-            action = "view";
+        if (action == null || "view".equals(action)) {
+            req.getRequestDispatcher("/WEB-INF/jsp/cart.jsp").forward(req, resp);
+            return;
         }
-
-        switch (action) {
-            case "add":
-                addToCart(req, resp);
-                break;
-            case "update":
-                updateCartQty(req, resp);
-                break;
-            case "remove":
-                removeFromCart(req, resp);
-                break;
-            case "clear":
-                clearCart(req, resp);
-                break;
-            case "view":
-            default:
-                req.getRequestDispatcher("/WEB-INF/jsp/cart.jsp").forward(req, resp);
-                break;
-        }
+        resp.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "购物车变更只允许使用POST");
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        doGet(req, resp);
+        String action = req.getParameter("action");
+        if ("add".equals(action)) {
+            addToCart(req, resp);
+        } else if ("update".equals(action)) {
+            updateCartQty(req, resp);
+        } else if ("remove".equals(action)) {
+            removeFromCart(req, resp);
+        } else if ("clear".equals(action)) {
+            clearCart(req, resp);
+        } else {
+            resp.sendError(HttpServletResponse.SC_BAD_REQUEST, "未知购物车操作");
+        }
     }
 
     @SuppressWarnings("unchecked")
