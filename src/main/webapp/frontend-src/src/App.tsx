@@ -12,69 +12,13 @@ import BookCard from './components/BookCard';
 import AuthModal from './components/AuthModal';
 import CartModal from './components/CartModal';
 import AdminPanel from './components/AdminPanel';
-
-// Seed initial demo data for a robust out-of-the-box experience
-const SEED_USERS: User[] = [
-  {
-    id: 'u_1',
-    username: 'zhangsan',
-    password: '123456',
-    role: 'user',
-    idCard: '42010619951208453X',
-    qq: '348912345',
-    phone: '13971234567',
-    email: 'zhangsan@foxmail.com',
-    registeredAt: '2026-06-20T10:00:00Z'
-  },
-  {
-    id: 'admin_1',
-    username: 'admin',
-    password: 'admin123',
-    role: 'admin',
-    idCard: '110101199003071234',
-    qq: '10001',
-    phone: '13888888888',
-    email: 'admin@bookstore.com',
-    registeredAt: '2026-06-01T08:00:00Z'
-  }
-];
-
-const SEED_ORDERS: Order[] = [
-  {
-    id: 'ORDER_20260624001',
-    userId: 'u_1',
-    username: 'zhangsan',
-    details: {
-      idCard: '42010619951208453X',
-      qq: '348912345',
-      phone: '13971234567',
-      email: 'zhangsan@foxmail.com',
-      shippingAddress: '湖北省武汉市武昌区八一路299号武汉大学宿舍区',
-      receiverName: '张三'
-    },
-    items: [
-      {
-        bookId: 'b1',
-        book: INITIAL_BOOKS[0], // Great Gatsby
-        quantity: 1
-      },
-      {
-        bookId: 'b5',
-        book: INITIAL_BOOKS[4], // Little Prince
-        quantity: 2
-      }
-    ],
-    totalAmount: 109.00,
-    status: 'Completed',
-    orderTime: '2026-06-24T14:30:00.000Z'
-  }
-];
+import { csrfFetch, resetCsrfToken } from './security/csrf';
 
 export default function App() {
   // Core Data States
   const [books, setBooks] = useState<Book[]>(INITIAL_BOOKS);
-  const [users, setUsers] = useState<User[]>(SEED_USERS);
-  const [orders, setOrders] = useState<Order[]>(SEED_ORDERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   
   // UI Display States
@@ -98,7 +42,7 @@ export default function App() {
     const fetchInitData = async () => {
       // 检查当前用户登录状态
       try {
-        const res = await fetch('/bookstore/auth?action=getCurrentUser', {
+        const res = await csrfFetch('/bookstore/auth?action=getCurrentUser', {
           headers: { 'Accept': 'application/json' }, credentials: 'include'
         });
         const data = await res.json();
@@ -113,7 +57,7 @@ export default function App() {
 
       // 加载用户列表
       try {
-        const res = await fetch('/bookstore/auth?action=listUsers', {
+        const res = await csrfFetch('/bookstore/auth?action=listUsers', {
           headers: { 'Accept': 'application/json' }, credentials: 'include'
         });
         const data = await res.json();
@@ -128,7 +72,7 @@ export default function App() {
 
       // 加载图书列表
       try {
-        const res = await fetch('/bookstore/books', {
+        const res = await csrfFetch('/bookstore/books', {
           headers: { 'Accept': 'application/json' }, credentials: 'include'
         });
         const data = await res.json();
@@ -143,7 +87,7 @@ export default function App() {
   // 加载订单列表
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/bookstore/order?action=list', {
+      const res = await csrfFetch('/bookstore/order?action=list', {
         headers: { 'Accept': 'application/json' }, credentials: 'include'
       });
       const data = await res.json();
@@ -165,7 +109,7 @@ export default function App() {
   // 加载所有订单（管理员）
   const fetchAllOrders = async () => {
     try {
-      const res = await fetch('/bookstore/order?action=listAllOrders', {
+      const res = await csrfFetch('/bookstore/order?action=listAllOrders', {
         headers: { 'Accept': 'application/json' }, credentials: 'include'
       });
       const data = await res.json();
@@ -187,7 +131,7 @@ export default function App() {
   // 加载图书列表（刷新用）
   const fetchBooks = async () => {
     try {
-      const res = await fetch('/bookstore/books', {
+      const res = await csrfFetch('/bookstore/books', {
         headers: { 'Accept': 'application/json' }, credentials: 'include'
       });
       const data = await res.json();
@@ -268,15 +212,18 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
-    // 调用后端注销 API
-    fetch('/bookstore/auth?action=logout', {
-      headers: { 'Accept': 'application/json' }, credentials: 'include'
-    }).catch(() => {});
-    setCurrentUser(null);
-    setCart([]);
-    setActiveTab('books');
-    addLog('SERVLET', 'LogoutServlet: 已销毁客户端 Session 信息并重定向到主页');
+  const handleLogout = async () => {
+    try {
+      await csrfFetch('/bookstore/auth?action=logout', {
+        method: 'POST', headers: { 'Accept': 'application/json' }, credentials: 'include'
+      });
+    } finally {
+      resetCsrfToken();
+      setCurrentUser(null);
+      setCart([]);
+      setActiveTab('books');
+      addLog('SERVLET', 'LogoutServlet: 已销毁客户端 Session 信息并重定向到主页');
+    }
   };
 
   // Cart operations
@@ -331,14 +278,11 @@ export default function App() {
     // 添加购物车商品索引参数
     cart.forEach((item, i) => {
       params.append(`itemBookId_${i}`, item.bookId);
-      params.append(`itemTitle_${i}`, item.book.title);
-      params.append(`itemCover_${i}`, item.book.coverImage);
-      params.append(`itemPrice_${i}`, String(item.book.price));
       params.append(`itemQty_${i}`, String(item.quantity));
     });
 
     try {
-      const res = await fetch('/bookstore/order', {
+      const res = await csrfFetch('/bookstore/order', {
         method: 'POST',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include',
@@ -381,7 +325,7 @@ export default function App() {
       description: newBook.description, coverImage: newBook.coverImage, rating: String(newBook.rating)
     });
     try {
-      const res = await fetch('/bookstore/books', {
+      const res = await csrfFetch('/bookstore/books', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: params.toString()
       });
@@ -397,7 +341,7 @@ export default function App() {
       description: updatedBook.description, coverImage: updatedBook.coverImage, rating: String(updatedBook.rating)
     });
     try {
-      const res = await fetch('/bookstore/books', {
+      const res = await csrfFetch('/bookstore/books', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: params.toString()
       });
@@ -408,7 +352,7 @@ export default function App() {
 
   const handleDeleteBook = async (id: string) => {
     try {
-      const res = await fetch('/bookstore/books', {
+      const res = await csrfFetch('/bookstore/books', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: new URLSearchParams({ action: 'deleteBook', id }).toString()
       });
@@ -424,14 +368,14 @@ export default function App() {
       idCard: updatedUser.idCard, qq: updatedUser.qq, phone: updatedUser.phone, email: updatedUser.email
     });
     try {
-      const res = await fetch('/bookstore/auth', {
+      const res = await csrfFetch('/bookstore/auth', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: params.toString()
       });
       const data = await res.json();
       if (data.success) {
         // 刷新用户列表
-        const listRes = await fetch('/bookstore/auth?action=listUsers', { headers: { 'Accept': 'application/json' }, credentials: 'include' });
+        const listRes = await csrfFetch('/bookstore/auth?action=listUsers', { headers: { 'Accept': 'application/json' }, credentials: 'include' });
         const listData = await listRes.json();
         if (listData.success) setUsers(listData.users.map((u: any) => ({ id: u.id, username: u.username, role: u.role, idCard: u.idCard, qq: u.qq, phone: u.phone, email: u.email, registeredAt: '' })));
       }
@@ -442,14 +386,14 @@ export default function App() {
   const handleDeleteUser = async (id: string) => {
     try {
       // 真正删除用户（从数据库中删除）
-      const res = await fetch('/bookstore/auth', {
+      const res = await csrfFetch('/bookstore/auth', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: new URLSearchParams({ action: 'deleteUser', id }).toString()
       });
       const data = await res.json();
       if (data.success) {
         // 刷新用户列表
-        const listRes = await fetch('/bookstore/auth?action=listUsers', { headers: { 'Accept': 'application/json' }, credentials: 'include' });
+        const listRes = await csrfFetch('/bookstore/auth?action=listUsers', { headers: { 'Accept': 'application/json' }, credentials: 'include' });
         const listData = await listRes.json();
         if (listData.success) setUsers(listData.users.map((u: any) => ({ id: u.id, username: u.username, role: u.role, idCard: u.idCard, qq: u.qq, phone: u.phone, email: u.email, registeredAt: '' })));
         // 刷新订单列表（因为待处理订单已被取消）
@@ -464,7 +408,7 @@ export default function App() {
   // User Cancel Order - 调用后端 API（普通用户取消订单）
   const handleCancelOrder = async (id: string) => {
     try {
-      const res = await fetch('/bookstore/order', {
+      const res = await csrfFetch('/bookstore/order', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: new URLSearchParams({ action: 'cancelOrder', id }).toString()
       });
@@ -482,7 +426,7 @@ export default function App() {
   // Admin Order handlers - 调用后端 API
   const handleUpdateOrderStatus = async (id: string, status: Order['status']) => {
     try {
-      const res = await fetch('/bookstore/order', {
+      const res = await csrfFetch('/bookstore/order', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: new URLSearchParams({ action: 'updateOrderStatus', id, status }).toString()
       });
@@ -493,7 +437,7 @@ export default function App() {
 
   const handleDeleteOrder = async (id: string) => {
     try {
-      const res = await fetch('/bookstore/order', {
+      const res = await csrfFetch('/bookstore/order', {
         method: 'POST', headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         credentials: 'include', body: new URLSearchParams({ action: 'deleteOrder', id }).toString()
       });

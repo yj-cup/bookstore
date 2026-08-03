@@ -2,6 +2,7 @@ package com.bookstore.servlet;
 
 import com.bookstore.dao.BookDao;
 import com.bookstore.entity.Book;
+import com.bookstore.util.AuthorizationUtil;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -12,7 +13,15 @@ import java.util.List;
 
 public class BookServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    private BookDao bookDao = new BookDao();
+    private final BookDao bookDao;
+
+    public BookServlet() {
+        this(new BookDao());
+    }
+
+    BookServlet(BookDao bookDao) {
+        this.bookDao = bookDao;
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -49,6 +58,10 @@ public class BookServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String action = req.getParameter("action");
+        if (("addBook".equals(action) || "editBook".equals(action) || "deleteBook".equals(action))
+                && !AuthorizationUtil.requireAdmin(req, resp)) {
+            return;
+        }
         if ("addBook".equals(action)) {
             handleAddBook(req, resp);
         } else if ("editBook".equals(action)) {
@@ -65,11 +78,16 @@ public class BookServlet extends HttpServlet {
         String title = req.getParameter("title");
         String author = req.getParameter("author");
         String category = req.getParameter("category");
-        double price = parseDouble(req.getParameter("price"), 0);
-        int stock = parseInt(req.getParameter("stock"), 0);
+        double price = parseDouble(req.getParameter("price"), -1);
+        int stock = parseInt(req.getParameter("stock"), -1);
         String description = req.getParameter("description");
         String coverImage = req.getParameter("coverImage");
         double rating = parseDouble(req.getParameter("rating"), 4.5);
+
+        if (!isValidBookInput(title, author, category, price, stock, rating)) {
+            writeJson(resp, "{\"success\":false,\"message\":\"图书信息不合法\"}");
+            return;
+        }
 
         if (coverImage == null || coverImage.trim().isEmpty()) {
             coverImage = "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=600";
@@ -88,11 +106,17 @@ public class BookServlet extends HttpServlet {
         String title = req.getParameter("title");
         String author = req.getParameter("author");
         String category = req.getParameter("category");
-        double price = parseDouble(req.getParameter("price"), 0);
-        int stock = parseInt(req.getParameter("stock"), 0);
+        double price = parseDouble(req.getParameter("price"), -1);
+        int stock = parseInt(req.getParameter("stock"), -1);
         String description = req.getParameter("description");
         String coverImage = req.getParameter("coverImage");
         double rating = parseDouble(req.getParameter("rating"), 4.5);
+
+        if (id == null || id.trim().isEmpty()
+                || !isValidBookInput(title, author, category, price, stock, rating)) {
+            writeJson(resp, "{\"success\":false,\"message\":\"图书信息不合法\"}");
+            return;
+        }
 
         Book book = new Book(id, title, author, category, price, stock, description, coverImage, rating);
         if (bookDao.update(book)) {
@@ -131,6 +155,16 @@ public class BookServlet extends HttpServlet {
     private int parseInt(String s, int defaultVal) {
         if (s == null || s.trim().isEmpty()) return defaultVal;
         try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return defaultVal; }
+    }
+
+    private boolean isValidBookInput(
+            String title, String author, String category, double price, int stock, double rating) {
+        return title != null && !title.trim().isEmpty()
+            && author != null && !author.trim().isEmpty()
+            && category != null && !category.trim().isEmpty()
+            && Double.isFinite(price) && price >= 0
+            && stock >= 0
+            && Double.isFinite(rating) && rating >= 0 && rating <= 5;
     }
 
     private String bookToJson(Book b) {

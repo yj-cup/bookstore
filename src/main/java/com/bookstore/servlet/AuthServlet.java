@@ -2,6 +2,8 @@ package com.bookstore.servlet;
 
 import com.bookstore.dao.UserDao;
 import com.bookstore.entity.User;
+import com.bookstore.util.AuthorizationUtil;
+import com.bookstore.filter.CsrfFilter;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -14,21 +16,25 @@ import java.util.UUID;
 
 public class AuthServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-    private UserDao userDao = new UserDao();
+    private final UserDao userDao;
+
+    public AuthServlet() {
+        this(new UserDao());
+    }
+
+    AuthServlet(UserDao userDao) {
+        this.userDao = userDao;
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String action = req.getParameter("action");
         if ("logout".equals(action)) {
-            HttpSession session = req.getSession(false);
-            if (session != null) {
-                session.invalidate(); // 完全注销会话
-            }
-            if (isAjax(req)) {
-                writeJson(resp, "{\"success\":true,\"message\":\"已注销\"}");
-            } else {
-                resp.sendRedirect(req.getContextPath() + "/books");
-            }
+            resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            writeJson(resp, "{\"success\":false,\"message\":\"注销只允许使用POST\"}");
+        } else if ("csrfToken".equals(action)) {
+            String token = (String) req.getAttribute(CsrfFilter.REQUEST_ATTRIBUTE);
+            writeJson(resp, "{\"success\":true,\"csrfToken\":\"" + escape(token) + "\"}");
         } else if ("getCurrentUser".equals(action)) {
             // AJAX API: 获取当前登录用户信息
             HttpSession session = req.getSession(false);
@@ -43,49 +49,15 @@ public class AuthServlet extends HttpServlet {
                 writeJson(resp, "{\"success\":false,\"message\":\"未登录\"}");
             }
         } else if ("listUsers".equals(action)) {
-            // AJAX API: 获取所有用户列表
-            List<User> allUsers = userDao.findAll();
-            StringBuilder sb = new StringBuilder();
-            sb.append("{\"success\":true,\"users\":[");
-            for (int i = 0; i < allUsers.size(); i++) {
-                if (i > 0) sb.append(",");
-                sb.append(userToJson(allUsers.get(i)));
+            if (!AuthorizationUtil.requireAdmin(req, resp)) {
+                return;
             }
-            sb.append("]}");
-            writeJson(resp, sb.toString());
-        } else if ("updateUser".equals(action)) {
-            // AJAX API: 编辑用户信息
-            String id = req.getParameter("id");
-            String password = req.getParameter("password");
-            String role = req.getParameter("role");
-            String idCard = req.getParameter("idCard");
-            String qq = req.getParameter("qq");
-            String phone = req.getParameter("phone");
-            String email = req.getParameter("email");
-            User u = new User(id, null, password != null ? password : "", role != null ? role : "user",
-                idCard != null ? idCard : "", qq != null ? qq : "",
-                phone != null ? phone : "", email != null ? email : "");
-            if (userDao.update(u)) {
-                writeJson(resp, "{\"success\":true,\"message\":\"用户更新成功\"}");
-            } else {
-                writeJson(resp, "{\"success\":false,\"message\":\"更新失败\"}");
-            }
-        } else if ("deleteUser".equals(action)) {
-            // AJAX API: 真正删除用户（从数据库中删除）
-            String id = req.getParameter("id");
-            if (userDao.delete(id)) {
-                writeJson(resp, "{\"success\":true,\"message\":\"用户已从数据库中彻底删除，该用户的待处理订单已自动取消\"}");
-            } else {
-                writeJson(resp, "{\"success\":false,\"message\":\"删除失败\"}");
-            }
-        } else if ("disableUser".equals(action)) {
-            // AJAX API: 禁用用户（软删除，推荐做法）
-            String id = req.getParameter("id");
-            if (userDao.disableUser(id)) {
-                writeJson(resp, "{\"success\":true,\"message\":\"用户已禁用，该用户的待处理订单已自动取消（已完成/已发货的订单不受影响）\"}");
-            } else {
-                writeJson(resp, "{\"success\":false,\"message\":\"禁用失败\"}");
-            }
+            handleListUsers(resp);
+        } else if ("updateUser".equals(action)
+                || "deleteUser".equals(action)
+                || "disableUser".equals(action)) {
+            resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
+            writeJson(resp, "{\"success\":false,\"message\":\"该操作只允许使用POST\"}");
         } else {
             req.getRequestDispatcher("/WEB-INF/jsp/login.jsp").forward(req, resp);
         }
@@ -98,10 +70,116 @@ public class AuthServlet extends HttpServlet {
             handleLogin(req, resp);
         } else if ("register".equals(action)) {
             handleRegister(req, resp);
-        } else if ("updateUser".equals(action) || "deleteUser".equals(action) || "disableUser".equals(action)) {
-            doGet(req, resp); // 路由到 doGet 中的对应处理
+        } else if ("logout".equals(action)) {
+            handleLogout(req, resp);
+        } else if ("updateUser".equals(action)) {
+            if (AuthorizationUtil.requireAdmin(req, resp)) {
+                handleUpdateUser(req, resp);
+            }
+        } else if ("deleteUser".equals(action)) {
+            if (AuthorizationUtil.requireAdmin(req, resp)) {
+                handleDeleteUser(req, resp);
+            }
+        } else if ("disableUser".equals(action)) {
+            if (AuthorizationUtil.requireAdmin(req, resp)) {
+                handleDisableUser(req, resp);
+            }
         } else {
             doGet(req, resp);
+        }
+    }
+
+    private void handleLogout(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        if (isAjax(req)) {
+            writeJson(resp, "{\"success\":true,\"message\":\"已注销\"}");
+        } else {
+            resp.sendRedirect(req.getContextPath() + "/books");
+        }
+    }
+
+    private void handleListUsers(HttpServletResponse resp) throws IOException {
+        List<User> allUsers = userDao.findAll();
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\"success\":true,\"users\":[");
+        for (int i = 0; i < allUsers.size(); i++) {
+            if (i > 0) sb.append(",");
+            sb.append(userToJson(allUsers.get(i)));
+        }
+        sb.append("]}");
+        writeJson(resp, sb.toString());
+    }
+
+    private void handleUpdateUser(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String id = req.getParameter("id");
+        String role = req.getParameter("role");
+        if (id == null || id.trim().isEmpty()
+                || (!"user".equals(role) && !"admin".equals(role))) {
+            writeJson(resp, "{\"success\":false,\"message\":\"用户ID或角色不合法\"}");
+            return;
+        }
+
+        User existing = userDao.findById(id.trim());
+        if (existing == null) {
+            writeJson(resp, "{\"success\":false,\"message\":\"用户不存在\"}");
+            return;
+        }
+
+        User updated = new User(
+            existing.getId(), existing.getUsername(), null, role,
+            valueOrEmpty(req.getParameter("idCard")),
+            valueOrEmpty(req.getParameter("qq")),
+            valueOrEmpty(req.getParameter("phone")),
+            valueOrEmpty(req.getParameter("email"))
+        );
+        if (userDao.update(updated)) {
+            HttpSession session = req.getSession(false);
+            User currentUser = session == null ? null : (User) session.getAttribute("currentUser");
+            if (currentUser != null && currentUser.getId().equals(updated.getId())) {
+                session.setAttribute("currentUser", updated);
+            }
+            writeJson(resp, "{\"success\":true,\"message\":\"用户更新成功\"}");
+        } else {
+            writeJson(resp, "{\"success\":false,\"message\":\"更新失败\"}");
+        }
+    }
+
+    private void handleDeleteUser(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String id = req.getParameter("id");
+        User target = id == null ? null : userDao.findById(id.trim());
+        if (target == null) {
+            writeJson(resp, "{\"success\":false,\"message\":\"用户不存在\"}");
+            return;
+        }
+        if ("admin".equals(target.getRole())) {
+            writeJson(resp, "{\"success\":false,\"message\":\"管理员账号不能删除\"}");
+            return;
+        }
+        if (userDao.delete(target.getId())) {
+            writeJson(resp, "{\"success\":true,\"message\":\"用户已删除，待处理订单已自动取消\"}");
+        } else {
+            writeJson(resp, "{\"success\":false,\"message\":\"删除失败\"}");
+        }
+    }
+
+    private void handleDisableUser(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        String id = req.getParameter("id");
+        User target = id == null ? null : userDao.findById(id.trim());
+        if (target == null) {
+            writeJson(resp, "{\"success\":false,\"message\":\"用户不存在\"}");
+            return;
+        }
+        if ("admin".equals(target.getRole())) {
+            writeJson(resp, "{\"success\":false,\"message\":\"管理员账号不能禁用\"}");
+            return;
+        }
+        if (userDao.disableUser(target.getId())) {
+            writeJson(resp, "{\"success\":true,\"message\":\"用户已禁用，待处理订单已自动取消\"}");
+        } else {
+            writeJson(resp, "{\"success\":false,\"message\":\"禁用失败\"}");
         }
     }
 
@@ -189,6 +267,7 @@ public class AuthServlet extends HttpServlet {
 
         if (userDao.insert(newUser)) {
             // 注册成功后自动创建 Session 并登录
+            newUser.setPassword(null);
             HttpSession session = req.getSession(true);
             session.setAttribute("currentUser", newUser);
             
@@ -212,10 +291,6 @@ public class AuthServlet extends HttpServlet {
 
     private void writeJson(HttpServletResponse resp, String json) throws IOException {
         resp.setContentType("application/json;charset=UTF-8");
-        // 添加 CORS 支持，允许跨域请求携带凭证
-        resp.setHeader("Access-Control-Allow-Origin", "*");
-        resp.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        resp.setHeader("Access-Control-Allow-Credentials", "true");
         resp.getWriter().write(json);
     }
 
@@ -238,6 +313,10 @@ public class AuthServlet extends HttpServlet {
             "\"phone\":\"" + escape(u.getPhone()) + "\"," +
             "\"email\":\"" + escape(u.getEmail()) + "\"" +
             "}";
+    }
+
+    private String valueOrEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private String escape(String s) {

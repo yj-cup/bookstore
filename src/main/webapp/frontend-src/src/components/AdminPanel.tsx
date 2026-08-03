@@ -131,7 +131,7 @@ export default function AdminPanel({
       };
       onEditBook(updated);
       addLog('SERVLET', `AdminBookServlet: 修改图书 [${updated.title}] 信息成功`);
-      addLog('JDBC', `更新图书表 t_books`, 
+      addLog('JDBC', `更新图书表 t_books`,
         `UPDATE t_books SET title='${updated.title}', author='${updated.author}', category='${updated.category}', price=${updated.price}, stock=${updated.stock} WHERE id='${updated.id}'`
       );
     } else {
@@ -142,8 +142,8 @@ export default function AdminPanel({
       };
       onAddBook(newBook);
       addLog('SERVLET', `AdminBookServlet: 新增图书 [${newBook.title}] 成功并上架入库`);
-      addLog('JDBC', `插入新图书记录`, 
-        `INSERT INTO t_books (id, title, author, category, price, stock, description, cover_image, rating) \nVALUES ('${newBook.id}', '${newBook.title}', '${newBook.author}', '${newBook.category}', ${newBook.price}, ${newBook.stock}, '${newBook.description}', '${newBook.coverImage}', 4.5)`
+      addLog('JDBC', `插入新图书记录`,
+        `INSERT INTO t_books (id, title, author, category, price, stock, description, cover_image, rating) VALUES ('${newBook.id}', '${newBook.title}', '${newBook.author}', '${newBook.category}', ${newBook.price}, ${newBook.stock}, '${newBook.description}', '${newBook.coverImage}', 4.5)`
       );
     }
     setIsBookModalOpen(false);
