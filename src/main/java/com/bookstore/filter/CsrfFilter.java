@@ -7,6 +7,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
@@ -20,6 +21,9 @@ public final class CsrfFilter implements Filter {
     public static final String REQUEST_ATTRIBUTE = "csrfToken";
     public static final String HEADER_NAME = "X-CSRF-Token";
     private static final SecureRandom RANDOM = new SecureRandom();
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {}
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -56,6 +60,9 @@ public final class CsrfFilter implements Filter {
         httpResponse.setHeader(HEADER_NAME, expected);
         chain.doFilter(request, response);
     }
+
+    @Override
+    public void destroy() {}
 
     private static boolean isSafeMethod(String method) {
         return "GET".equalsIgnoreCase(method)

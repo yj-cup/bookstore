@@ -1,8 +1,10 @@
 package com.bookstore.entity;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 public class CartItem implements Serializable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private String bookId;

@@ -1,10 +1,12 @@
 package com.bookstore.entity;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Order implements Serializable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private String id;
